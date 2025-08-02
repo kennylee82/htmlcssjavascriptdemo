@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Maps API Example</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: #4285f4;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .controls {
+            padding: 20px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .controls button {
+            background: #4285f4;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        .controls button:hover {
+            background: #3367d6;
+        }
+        
+        .controls input {
+            padding: 8px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        #map {
+            height: 500px;
+            width: 100%;
+        }
+        
+        .info {
+            padding: 20px;
+            background: #f8f9fa;
+            font-size: 14px;
+            color: #666;
+        }
+        
+        .warning {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+            padding: 15px;
+            margin: 20px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Google Maps API Example</h1>
+            <p>Interactive map with markers, info windows, and controls</p>
+        </div>
+        
+        <div class="warning">
+            <strong>Note:</strong> This example requires a valid Google Maps API key. Replace "YOUR_API_KEY" in the script tag below with your actual API key from the Google Cloud Console.
+        </div>
+        
+        <div class="controls">
+            <button onclick="addRandomMarker()">Add Random Marker</button>
+            <button onclick="clearMarkers()">Clear All Markers</button>
+            <button onclick="goToLocation()">Go to Sydney</button>
+            <button onclick="toggleMapType()">Toggle Map Type</button>
+            <input type="text" id="searchInput" placeholder="Enter an address" style="width: 200px;">
+            <button onclick="searchLocation()">Search</button>
+        </div>
+        
+        <div id="map"></div>
+        
+        <div class="info">
+            <h3>Features Demonstrated:</h3>
+            <ul>
+                <li>Map initialization with custom center and zoom</li>
+                <li>Adding and removing markers</li>
+                <li>Info windows with custom content</li>
+                <li>Map type switching (roadmap/satellite)</li>
+                <li>Geocoding for address search</li>
+                <li>Event listeners for user interactions</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        let map;
+        let markers = [];
+        let infoWindow;
+        let geocoder;
+        let currentMapType = 'roadmap';
+
+        // Sample locations for demonstration
+        const sampleLocations = [
+            { lat: -33.8688, lng: 151.2093, title: "Sydney Opera House" },
+            { lat: -33.8570, lng: 151.2152, title: "Sydney Harbour Bridge" },
+            { lat: -33.8915, lng: 151.2767, title: "Bondi Beach" },
+            { lat: -33.8339, lng: 151.2135, title: "Darling Harbour" },
+            { lat: -33.8523, lng: 151.2108, title: "Royal Botanic Gardens" }
+        ];
+
+        // Initialize the map
+        function initMap() {
+            // Create the map centered on Sydney
+            map = new google.maps.Map(document.getElementById("map"), {
+                zoom: 13,
+                center: { lat: -33.8688, lng: 151.2093 }, // Sydney coordinates
+                mapTypeId: google.maps.MapTypeId.ROADMAP,
+                streetViewControl: true,
+                fullscreenControl: true,
+                zoomControl: true,
+                mapTypeControl: true
+            });
+
+            // Initialize info window and geocoder
+            infoWindow = new google.maps.InfoWindow();
+            geocoder = new google.maps.Geocoder();
+
+            // Add sample markers
+            addSampleMarkers();
+
+            // Add click listener to map
+            map.addListener("click", (event) => {
+                addMarker(event.latLng, "Clicked Location", "You clicked here!");
+            });
+        }
+
+        // Add sample markers to the map
+        function addSampleMarkers() {
+            sampleLocations.forEach((location, index) => {
+                addMarker(
+                    new google.maps.LatLng(location.lat, location.lng),
+                    location.title,
+                    `This is ${location.title}. Marker #${index + 1}`
+                );
+            });
+        }
+
+        // Add a marker to the map
+        function addMarker(position, title, content) {
+            const marker = new google.maps.Marker({
+                position: position,
+                map: map,
+                title: title,
+                animation: google.maps.Animation.DROP
+            });
+
+            // Add click listener to marker
+            marker.addListener("click", () => {
+                infoWindow.setContent(`
+                    <div style="padding: 10px;">
+                        <h3 style="margin: 0 0 10px 0; color: #333;">${title}</h3>
+                        <p style="margin: 0; color: #666;">${content}</p>
+                        <p style="margin: 10px 0 0 0; font-size: 12px; color: #999;">
+                            Lat: ${position.lat().toFixed(6)}, Lng: ${position.lng().toFixed(6)}
+                        </p>
+                    </div>
+                `);
+                infoWindow.open(map, marker);
+            });
+
+            markers.push(marker);
+        }
+
+        // Add a random marker
+        function addRandomMarker() {
+            const bounds = map.getBounds();
+            if (!bounds) return;
+
+            const ne = bounds.getNorthEast();
+            const sw = bounds.getSouthWest();
+
+            const randomLat = sw.lat() + Math.random() * (ne.lat() - sw.lat());
+            const randomLng = sw.lng() + Math.random() * (ne.lng() - sw.lng());
+
+            const randomPosition = new google.maps.LatLng(randomLat, randomLng);
+            const markerCount = markers.length + 1;
+
+            addMarker(
+                randomPosition,
+                `Random Marker ${markerCount}`,
+                `This is a randomly placed marker #${markerCount}`
+            );
+        }
+
+        // Clear all markers
+        function clearMarkers() {
+            markers.forEach(marker => {
+                marker.setMap(null);
+            });
+            markers = [];
+            infoWindow.close();
+        }
+
+        // Go to Sydney location
+        function goToLocation() {
+            const sydney = { lat: -33.8688, lng: 151.2093 };
+            map.setCenter(sydney);
+            map.setZoom(15);
+        }
+
+        // Toggle between roadmap and satellite view
+        function toggleMapType() {
+            currentMapType = currentMapType === 'roadmap' ? 'satellite' : 'roadmap';
+            map.setMapTypeId(currentMapType);
+        }
+
+        // Search for a location using geocoding
+        function searchLocation() {
+            const address = document.getElementById('searchInput').value;
+            if (!address.trim()) {
+                alert('Please enter an address to search');
+                return;
+            }
+
+            geocoder.geocode({ address: address }, (results, status) => {
+                if (status === 'OK') {
+                    map.setCenter(results[0].geometry.location);
+                    map.setZoom(15);
+                    
+                    addMarker(
+                        results[0].geometry.location,
+                        'Search Result',
+                        `Found: ${results[0].formatted_address}`
+                    );
+                } else {
+                    alert('Geocoding failed: ' + status);
+                }
+            });
+        }
+
+        // Handle enter key in search input
+        document.getElementById('searchInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                searchLocation();
+            }
+        });
+
+        // Error handling for map loading
+        window.gm_authFailure = function() {
+            alert('Google Maps API authentication failed. Please check your API key.');
+        };
+    </script>
+
+    <!-- Load Google Maps API -->
+    <!-- Replace YOUR_API_KEY with your actual Google Maps API key -->
+    <script async defer
+        src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&callback=initMap&libraries=geometry">
+    </script>
+</body>
+</html>
